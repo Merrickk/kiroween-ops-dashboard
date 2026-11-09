@@ -91,7 +91,8 @@
 ## Vercel serverless 适配
 
 - 入口 `api/index.py` 只做转发：把仓库根目录加入 import path，复用同一个 FastAPI `app`；
-  另导出 Mangum `handler`（lifespan="off"）。
+  **只导出 `app`，不要导出 Mangum `handler`**——两者并存时运行时走 Mangum、收到的是
+  rewrite 后的路径（`/api/index`），全部路由都会 404（2026-11-09 实测）。
 - `vercel.json` 用 `includeFiles` 把 `app.py`、`prober.py`、`store.py`、`static/**`
   打进函数包，并把全部路由 rewrite 到 `/api/index`。
 - 文件系统除 `/tmp` 只读：`VERCEL=1` 时数据库改写 `/tmp/ops.db`；空库时自动放入
