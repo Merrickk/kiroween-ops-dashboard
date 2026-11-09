@@ -1,0 +1,16 @@
+[Unit]
+Description=Ops Dashboard (Kiroween 2026)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/ops-dashboard
+Environment=PORT=8000
+ExecStart=/opt/ops-dashboard/.venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
