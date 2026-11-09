@@ -87,3 +87,15 @@
 - 单元测试（pytest）：探活器对本地回环地址的成功/失败判定、证书天数计算、离线阈值逻辑。
 - 接口测试：FastAPI TestClient 覆盖 hosts/deploys/checks 的增查与 /healthz。
 - 手工验收：启动服务，登记一台真实域名与一台本地地址，跑一遍一键测试，确认页面三块都出数。
+
+## Vercel serverless 适配
+
+- 入口 `api/index.py` 只做转发：把仓库根目录加入 import path，复用同一个 FastAPI `app`；
+  另导出 Mangum `handler`（lifespan="off"）。
+- `vercel.json` 用 `includeFiles` 把 `app.py`、`prober.py`、`store.py`、`static/**`
+  打进函数包，并把全部路由 rewrite 到 `/api/index`。
+- 文件系统除 `/tmp` 只读：`VERCEL=1` 时数据库改写 `/tmp/ops.db`；空库时自动放入
+  两台演示机器（tv.ztech.eu.cc、example.com），这样冷启动后首页也有数据。
+- 定时检查线程在 serverless 下不启动，检查改走“一键跑测试”按需执行；
+  探活用线程池并行跑，避免 Hobby 档 10 秒函数时限。
+- 本地行为不变：`python app.py` 仍用 `./ops.db` + 后台定时线程。

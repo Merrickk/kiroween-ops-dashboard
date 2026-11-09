@@ -4,8 +4,10 @@ Run:  pip install -r requirements.txt && python app.py
 Then open http://localhost:8000
 """
 
+import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,8 +29,11 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     store.init_db()
-    thread = threading.Thread(target=_scheduler_loop, daemon=True)
-    thread.start()
+    # No scheduler thread on Vercel: serverless functions cannot run
+    # background loops. Checks there run on demand via /api/checks/run.
+    if os.environ.get("VERCEL") != "1":
+        thread = threading.Thread(target=_scheduler_loop, daemon=True)
+        thread.start()
     yield
 
 
@@ -63,18 +68,23 @@ def _scheduler_loop() -> None:
 
 
 def run_all_checks() -> list[dict]:
-    """Probe every host once, record results, update statuses. Returns results."""
+    """Probe every host once, record results, update statuses. Returns results.
+
+    Probes run in parallel so a serverless invocation (10s limit on Vercel
+    Hobby) finishes in time; DB writes stay sequential on one connection.
+    """
     results = []
     with store.connect() as conn:
+        store.ensure_seeded(conn)
         hosts = store.list_hosts(conn)
-        for host in hosts:
-            outcome = prober.probe_host(host["address"])
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            outcomes = list(pool.map(prober.probe_host, [h["address"] for h in hosts]))
+        for host, outcome in zip(hosts, outcomes):
             store.add_check(conn, host["id"], outcome["ok"], outcome["latency_ms"], outcome["detail"])
             # Offline only after N consecutive failures.
             if outcome["ok"]:
                 new_status = "online"
                 last_seen = _now_iso()
-                failures = 0
             else:
                 recent = conn.execute(
                     "SELECT ok FROM checks WHERE host_id = ? ORDER BY id DESC LIMIT ?",
@@ -108,6 +118,7 @@ def index():
 @app.get("/api/hosts")
 def api_list_hosts() -> list[dict]:
     with store.connect() as conn:
+        store.ensure_seeded(conn)
         return store.list_hosts(conn)
 
 

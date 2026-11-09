@@ -39,3 +39,10 @@
   - [ ] 6.2 写 README（含运行方法与 Kiro 用法说明）
   - [ ] 6.3 录 3 分钟内演示视频并公开到 YouTube
   - [ ] 6.4 Devpost 存草稿复核，12 月 4 日 Billings 15:00 前提交
+
+- [ ] 7. Vercel serverless 适配（演示托管改走 Vercel）
+  - [ ] 7.1 api/index.py 转发入口 + vercel.json（includeFiles + rewrites）
+  - [ ] 7.2 数据库改写 /tmp（VERCEL=1 时），空库自动放演示机器
+  - [ ] 7.3 serverless 下不启动定时线程，探活改线程池并行
+  - [ ] 7.4 本地 pytest 全过 + VERCEL=1 模拟验收通过
+  - [ ] 7.5 Vercel 上部署并公开访问验证

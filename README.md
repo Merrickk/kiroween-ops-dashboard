@@ -16,6 +16,17 @@ python app.py
 SQLite 数据库（`ops.db`）首次启动自动建表，无需额外配置。
 健康检查每 15 分钟自动跑一次；`/healthz` 返回 `{"status": "ok"}`。
 
+## Vercel 部署（演示用）
+
+```bash
+vercel  # 或在 vercel.com 上导入本仓库，Hobby 免费档，不用绑卡
+```
+
+Vercel 上跑的是 serverless 版（`api/index.py` + `vercel.json`），与本地同一份代码：
+数据库写到 `/tmp`，空库时自动放入演示机器（tv.ztech.eu.cc、example.com）；
+15 分钟定时检查在 serverless 下不跑，检查改走页面上的“一键跑测试”按需执行。
+持久化部署（Render / 自有机器）仍按上面一条命令跑，定时检查正常工作。
+
 ## Tests
 
 ```bash

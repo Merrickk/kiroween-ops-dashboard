@@ -3,10 +3,22 @@
 Tables: hosts, deploys, checks. Created automatically on first start.
 """
 
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).with_name("ops.db")
+# On Vercel the filesystem is read-only except /tmp; use /tmp/ops.db there.
+if os.environ.get("VERCEL") == "1":
+    DB_PATH = Path("/tmp/ops.db")
+else:
+    DB_PATH = Path(__file__).with_name("ops.db")
+
+# Demo hosts seeded only on Vercel when the DB is empty, so the first
+# visitor sees real data even though /tmp storage is ephemeral.
+DEMO_HOSTS = [
+    ("tv.ztech.eu.cc", "https://tv.ztech.eu.cc", "domain"),
+    ("example.com", "https://example.com", "domain"),
+]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS hosts (
@@ -42,7 +54,7 @@ CREATE TABLE IF NOT EXISTS checks (
 def connect(db_path: Path | None = None) -> sqlite3.Connection:
     if db_path is None:
         db_path = DB_PATH
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -56,6 +68,20 @@ def init_db(db_path: Path | None = None) -> None:
 
 def row_to_dict(row: sqlite3.Row) -> dict:
     return dict(row)
+
+
+def ensure_seeded(conn) -> None:
+    """On Vercel only: insert demo hosts when the DB is empty (idempotent)."""
+    if os.environ.get("VERCEL") != "1":
+        return
+    count = conn.execute("SELECT COUNT(*) FROM hosts").fetchone()[0]
+    if count == 0:
+        for name, address, kind in DEMO_HOSTS:
+            conn.execute(
+                "INSERT INTO hosts (name, address, kind) VALUES (?, ?, ?)",
+                (name, address, kind),
+            )
+        conn.commit()
 
 
 def list_hosts(conn) -> list[dict]:
