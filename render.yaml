@@ -1,0 +1,11 @@
+# Render free web service (750h/month, spins down after inactivity).
+# Connect the GitHub repo in the Render dashboard; this file is picked up automatically.
+services:
+  - type: web
+    name: ops-dashboard
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "8000"

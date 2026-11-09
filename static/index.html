@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ops Dashboard — Kiroween 2026</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .3rem; }
+  table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+  th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid #eee; font-size: .92rem; }
+  .online { color: #1a7f37; font-weight: 600; } .offline { color: #cf222e; font-weight: 600; }
+  .unknown { color: #666; } .warn { color: #b54708; font-weight: 700; }
+  form { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .5rem; }
+  input, select, button { padding: .45rem .6rem; font-size: .92rem; }
+  button { cursor: pointer; }
+  .muted { color: #666; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>🎃 Ops Dashboard <span class="muted">— Kiroween 2026 · Frankenstein</span></h1>
+<p class="muted">个人服务器运维一览：探活状态、证书到期、部署记录、定时健康检查。数据每 30 秒自动刷新。</p>
+
+<h2>机器状态</h2>
+<form id="hostForm">
+  <input id="hostName" placeholder="名称，如 tv.ztech.eu.cc" required>
+  <input id="hostAddress" placeholder="地址，如 https://tv.ztech.eu.cc" required>
+  <select id="hostKind"><option value="server">server</option><option value="domain">domain</option><option value="node">node</option></select>
+  <button type="submit">添加机器</button>
+</form>
+<table><thead><tr><th>名称</th><th>地址</th><th>状态</th><th>延迟</th><th>证书到期</th><th>最后在线</th><th></th></tr></thead>
+<tbody id="hostsBody"><tr><td colspan="7" class="muted">加载中…</td></tr></tbody></table>
+
+<h2>部署记录</h2>
+<form id="deployForm">
+  <select id="deployHost"></select>
+  <input id="deploySummary" placeholder="部署内容一句话" required>
+  <input id="deployActor" placeholder="执行人">
+  <select id="deployResult"><option value="success">成功</option><option value="failed">失败</option></select>
+  <button type="submit">记一次部署</button>
+</form>
+<table><thead><tr><th>时间</th><th>机器</th><th>内容</th><th>执行人</th><th>结果</th></tr></thead>
+<tbody id="deploysBody"></tbody></table>
+
+<h2>健康检查 <button id="runChecks">一键跑测试</button> <span id="runMsg" class="muted"></span></h2>
+<table><thead><tr><th>时间</th><th>机器</th><th>结果</th><th>延迟</th><th>详情</th></tr></thead>
+<tbody id="checksBody"></tbody></table>
+
+<script>
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function certCell(h) {
+  if (!h.cert_expires_at) return '<span class="unknown">未知</span>';
+  const days = Math.floor((new Date(h.cert_expires_at) - Date.now()) / 86400000);
+  const cls = days <= 14 ? 'warn' : '';
+  return `<span class="${cls}">${h.cert_expires_at.slice(0, 10)}（剩 ${days} 天）</span>`;
+}
+async function refresh() {
+  const hosts = await api('/api/hosts');
+  document.getElementById('hostsBody').innerHTML = hosts.map(h => `<tr>
+    <td>${h.name}</td><td>${h.address}</td>
+    <td class="${h.status}">${h.status}</td>
+    <td>${h.last_latency_ms == null ? '—' : h.last_latency_ms + ' ms'}</td>
+    <td>${certCell(h)}</td><td>${h.last_seen_at ? h.last_seen_at.slice(0, 19).replace('T', ' ') : '—'}</td>
+    <td><button onclick="delHost(${h.id})">删除</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">还没有机器，先在上面添加一台。</td></tr>';
+  document.getElementById('deployHost').innerHTML = hosts.map(h => `<option value="${h.id}">${h.name}</option>`).join('');
+  const deploys = await api('/api/deploys');
+  document.getElementById('deploysBody').innerHTML = deploys.map(d => `<tr>
+    <td>${d.created_at.slice(0, 19).replace('T', ' ')}</td><td>${d.host_name || ''}</td>
+    <td>${d.summary}</td><td>${d.actor || '—'}</td><td>${d.result}</td></tr>`).join('');
+  const checks = await api('/api/checks');
+  document.getElementById('checksBody').innerHTML = checks.map(c => `<tr>
+    <td>${c.checked_at.slice(0, 19).replace('T', ' ')}</td><td>${c.host_name || ''}</td>
+    <td>${c.ok ? '✅ 通过' : '❌ 失败'}</td><td>${c.latency_ms == null ? '—' : c.latency_ms + ' ms'}</td>
+    <td>${c.detail}</td></tr>`).join('');
+}
+async function delHost(id) {
+  if (!confirm('删除这台机器？')) return;
+  await api('/api/hosts/' + id, { method: 'DELETE' });
+  refresh();
+}
+document.getElementById('hostForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  await api('/api/hosts', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: hostName.value, address: hostAddress.value, kind: hostKind.value }) });
+  e.target.reset(); refresh();
+});
+document.getElementById('deployForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  await api('/api/deploys', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ host_id: +deployHost.value, summary: deploySummary.value, actor: deployActor.value, result: deployResult.value }) });
+  e.target.reset(); refresh();
+});
+document.getElementById('runChecks').addEventListener('click', async () => {
+  runMsg.textContent = '跑测试中…';
+  const res = await api('/api/checks/run', { method: 'POST' });
+  runMsg.textContent = `完成：${res.filter(r => r.ok).length}/${res.length} 通过`;
+  refresh();
+});
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>
