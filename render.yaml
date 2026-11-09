@@ -6,6 +6,4 @@ services:
     runtime: docker
     plan: free
     healthCheckPath: /healthz
-    envVars:
-      - key: PORT
-        value: "8000"
+    # PORT is set automatically by Render; app.py reads $PORT (default 8000).
