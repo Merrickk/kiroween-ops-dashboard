@@ -4,8 +4,8 @@ Usage:
     python seed_demo.py https://ops-dashboard-xxxx.onrender.com
 
 Only adds hosts/deploys via the public API; never deploys proxy nodes.
-tv.ztech.eu.cc is a real domain whose cert expires 2026-11-19, so the
-countdown column shows a genuine near-expiry warning.
+Hosts are auto-seeded on Vercel, so this script is mainly useful for
+persistent deployments (Render / own machine).
 """
 
 import json
