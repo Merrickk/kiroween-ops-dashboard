@@ -8,8 +8,9 @@ Built with [Kiro](https://kiro.dev) using spec-driven development — see
 ## Quick start
 
 ```bash
-pip install -r requirements.txt
-python app.py
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python app.py
 # open http://localhost:8000
 ```
 
@@ -35,8 +36,16 @@ rewrite**。数据库写到 `/tmp`，空库时自动放入演示机器（tv.ztec
 ## Tests
 
 ```bash
-pytest -q
+.venv/bin/python -m pytest -q
 ```
+
+## Agent hooks
+
+`.kiro/hooks/run-tests-on-save.json` runs the full test suite automatically
+whenever the agent saves or edits a Python file (`PostFileSave` trigger),
+so a broken change is caught in the same session instead of at deploy time.
+It needs the project venv above — the command it runs is
+`.venv/bin/python -m pytest -q`.
 
 ## How Kiro was used
 
@@ -44,3 +53,5 @@ pytest -q
   按 requirements → design → tasks 的流程走。
 - 实现对照 tasks.md 逐项完成，每项跑通测试再往下走。
 - Steering 文档（`.kiro/steering/`）记录技术选型与项目结构约定。
+- Agent hook（`.kiro/hooks/`）：agent 一保存 `.py` 文件就自动跑完整测试，
+  改坏了当场发现，不用等到部署才暴露。
